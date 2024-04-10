@@ -89,7 +89,8 @@ fn infix_binding_power(op: char) -> (u8, u8) {
     match op {
         '+' | '-' => (1, 2),
         '*' | '/' => (3, 4),
-        _ => panic!("bad op: {:?}", op)
+        '.' => (6, 5),
+        _ => panic!("bad op: {:?}", op),
     }
 }
 
@@ -103,4 +104,10 @@ fn tests() {
 
     let s = expr("a + b * c * d + e");
     assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+
+    let s = expr("f . g . h");
+    assert_eq!(s.to_string(), "(. f (. g h))");
+
+    let s = expr(" 1 + 2 + f . g . h * 3 * 4");
+    assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (. f (. g h)) 3) 4))");
 }
