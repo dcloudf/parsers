@@ -63,6 +63,11 @@ fn expr(input: &str) -> S {
 fn expr_br(lexer: &mut Lexer, min_bp: u8) -> S {
     let mut lhs = match lexer.next() {
         Token::Atom(it) => S::Atom(it),
+        Token::Op(op) => {
+            let ((), r_br) = prefix_binding_power(op);
+            let rhs = expr_br(lexer, r_br);
+            S::Cons(op, vec![rhs])
+        }
         t => panic!("bad token: {:?}", t),
     };
 
@@ -72,6 +77,15 @@ fn expr_br(lexer: &mut Lexer, min_bp: u8) -> S {
             Token::Op(op) => op,
             t => panic!("bad token: {:?}", t),
         };
+        if let Some((l_bp, ())) = postfix_binding_power(op) {
+            if l_bp < min_bp {
+                break;
+            }
+            lexer.next();
+            lhs = S::Cons(op, vec![lhs]);
+            continue;
+        }
+
         let (l_br, r_bp) = infix_binding_power(op);
         if l_br < min_bp {
             break;
@@ -85,11 +99,26 @@ fn expr_br(lexer: &mut Lexer, min_bp: u8) -> S {
     lhs
 }
 
+fn prefix_binding_power(op: char) -> ((), u8) {
+    match op {
+        '+' | '-' => ((), 5),
+        _ => panic!("bad op: {:?}", op),
+    }
+}
+
+fn postfix_binding_power(op: char) -> Option<(u8, ())> {
+    let res = match op {
+        '!' => (7, ()),
+        _ => return None,
+    };
+    Some(res)
+}
+
 fn infix_binding_power(op: char) -> (u8, u8) {
     match op {
         '+' | '-' => (1, 2),
         '*' | '/' => (3, 4),
-        '.' => (6, 5),
+        '.' => (10, 9),
         _ => panic!("bad op: {:?}", op),
     }
 }
@@ -110,4 +139,16 @@ fn tests() {
 
     let s = expr(" 1 + 2 + f . g . h * 3 * 4");
     assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (. f (. g h)) 3) 4))");
+
+    let s = expr("--1 * 2");
+    assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
+
+    let s = expr("--f . g");
+    assert_eq!(s.to_string(), "(- (- (. f g)))");
+
+    let s = expr("-9!");
+    assert_eq!(s.to_string(), "(- (! 9))");
+
+    let s = expr("f . g !");
+    assert_eq!(s.to_string(), "(! (. f g))");
 }
